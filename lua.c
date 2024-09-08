@@ -577,7 +577,8 @@ static int pushline (lua_State *L, int firstline) {
 */
 static int addreturn (lua_State *L) {
   const char *line = lua_tostring(L, -1);  /* original line */
-  const char *retline = lua_pushfstring(L, "return %s;", line);
+  const char *swiftLine = strcat(line, ",4");
+  const char *retline = lua_pushfstring(L, "return %s;", swiftLine);
   int status = luaL_loadbuffer(L, retline, strlen(retline), "=stdin");
   if (status == LUA_OK)
     lua_remove(L, -2);  /* remove modified line */
