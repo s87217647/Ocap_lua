@@ -722,6 +722,13 @@ static int pmain (lua_State *L) {
 }
 
 
+static int l_sin (lua_State *L) {
+    double d = lua_tonumber(L, 1); /* get argument */
+    lua_pushnumber(L, sin(d)); /* push result */
+    return 1; /* number of results */
+}
+
+
 
 int main (int argc, char **argv) {
   int status, result;
@@ -730,6 +737,16 @@ int main (int argc, char **argv) {
     l_message(argv[0], "cannot create state: not enough memory");
     return EXIT_FAILURE;
   }
+//----
+    //#include "bool_array.h"
+
+
+    lua_pushcfunction(L, l_sin);
+    lua_setglobal(L, "mysin");
+
+
+//-----
+
   lua_gc(L, LUA_GCSTOP);  /* stop GC while building state */
   lua_pushcfunction(L, &pmain);  /* to call 'pmain' in protected mode */
   lua_pushinteger(L, argc);  /* 1st argument */

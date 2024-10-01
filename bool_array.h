@@ -85,7 +85,7 @@ static const struct luaL_Reg arraylib [] = {
         {NULL, NULL}
 };
 
-int luaopen_array (lua_State *L) {
-    luaL_newlib(L, arraylib);
-    return 1;
-}
+//int luaopen_array (lua_State *L) {
+//    luaL_newlib(L, arraylib);
+//    return 1;
+//}
