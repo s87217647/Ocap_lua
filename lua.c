@@ -722,52 +722,83 @@ static int pmain (lua_State *L) {
 }
 
 
-//
-//int main (int argc, char **argv) {
-//  int status, result;
-//  lua_State *L = luaL_newstate();  /* create state */
-//  if (L == NULL) {
-//    l_message(argv[0], "cannot create state: not enough memory");
-//    return EXIT_FAILURE;
-//  }
-//  lua_gc(L, LUA_GCSTOP);  /* stop GC while building state */
-//  lua_pushcfunction(L, &pmain);  /* to call 'pmain' in protected mode */
-//  lua_pushinteger(L, argc);  /* 1st argument */
-//  lua_pushlightuserdata(L, argv); /* 2nd argument */
-//  status = lua_pcall(L, 2, 1, 0);  /* do the call */
-//  result = lua_toboolean(L, -1);  /* get result */
-//  report(L, status);
-//  lua_close(L);
-//  return (result && status == LUA_OK) ? EXIT_SUCCESS : EXIT_FAILURE;
+
+int main (int argc, char **argv) {
+  int status, result;
+  lua_State *L = luaL_newstate();  /* create state */
+  if (L == NULL) {
+    l_message(argv[0], "cannot create state: not enough memory");
+    return EXIT_FAILURE;
+  }
+  lua_gc(L, LUA_GCSTOP);  /* stop GC while building state */
+  lua_pushcfunction(L, &pmain);  /* to call 'pmain' in protected mode */
+  lua_pushinteger(L, argc);  /* 1st argument */
+  lua_pushlightuserdata(L, argv); /* 2nd argument */
+  status = lua_pcall(L, 2, 1, 0);  /* do the call */
+  result = lua_toboolean(L, -1);  /* get result */
+  report(L, status);
+  lua_close(L);
+  return (result && status == LUA_OK) ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+
+
+//// ------------------------------- below is the bare bone compiler ---------------------------
+//static int l_sin (lua_State *L) {
+//    double d = lua_tonumber(L, 1); /* get argument */
+//    lua_pushnumber(L, sin(d)); /* push result */
+//    return 1; /* number of results */
 //}
-
-
-// ------------------------------- below is the bare bone compiler
-static int l_sin (lua_State *L) {
-    double d = lua_tonumber(L, 1); /* get argument */
-    lua_pushnumber(L, sin(d)); /* push result */
-    return 1; /* number of results */
-}
-
-int main (void) {
-    char buff[256];
-    int error;
-    lua_State *L = luaL_newstate(); /* opens Lua */
-    luaL_openlibs(L); /* opens the standard libraries */
-
-    lua_pushcfunction(L, l_sin);
-    lua_setglobal(L, "mysin");
-
-
-    while (fgets(buff, sizeof(buff), stdin) != NULL) {
-        error = luaL_loadstring(L, buff) || lua_pcall(L, 0, 0, 0);
-        if (error) {
-            fprintf(stderr, "%s\n", lua_tostring(L, -1));
-            lua_pop(L, 1); /* pop error message from the stack */
-        }
-
-    }
-
-    lua_close(L);
-    return 0;
-}
+//
+//static void stackDump (lua_State *L) {
+//    int i;
+//    int top = lua_gettop(L); /* depth of the stack */
+//    for (i = 1; i <= top; i++) { /* repeat for each level */
+//        int t = lua_type(L, i);
+//        switch (t) {
+//            case LUA_TSTRING: { /* strings */
+//                printf("'%s'", lua_tostring(L, i));
+//                break;
+//            }
+//            case LUA_TBOOLEAN: { /* Booleans */
+//                printf(lua_toboolean(L, i) ? "true" : "false");
+//                break;
+//            }
+//            case LUA_TNUMBER: { /* numbers */
+//                printf("%g", lua_tonumber(L, i));
+//                break;
+//            }
+//            default: { /* other values */
+//                printf("%s", lua_typename(L, t));
+//                break;
+//            }
+//        }
+//        printf(" "); /* put a separator */
+//    }
+//}
+//
+//
+//int main (void) {
+//    char buff[256];
+//    int error;
+//    lua_State *L = luaL_newstate(); /* opens Lua */
+//    luaL_openlibs(L); /* opens the standard libraries */
+//
+//    lua_pushcfunction(L, l_sin);
+//    lua_setglobal(L, "mysin");
+//
+//
+//    while (fgets(buff, sizeof(buff), stdin) != NULL) {
+//        error = luaL_loadstring(L, buff) || lua_pcall(L, 0, 0, 0);
+//        if (error) {
+//            fprintf(stderr, "%s\n", lua_tostring(L, -1));
+//            lua_pop(L, 1); /* pop error message from the stack */
+//        }
+//        else{
+//            stackDump(L);
+//        }
+//
+//    }
+//
+//    lua_close(L);
+//    return 0;
+//}
