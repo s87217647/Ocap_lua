@@ -728,7 +728,30 @@ static int l_sin (lua_State *L) {
     return 1; /* number of results */
 }
 
+static int helloWord(lua_State *L){
+    char *str = "Hello world";
+    lua_pushnumber(L, 9);
+    lua_pushstring(L, str);
+    return 2;
+}
 
+static const struct luaL_Reg mylib[] = {
+        {"helloWorld", helloWord},
+        {"mysin", l_sin},
+        {NULL, NULL}
+};
+
+
+int luaopen_mylib (lua_State *L) {
+    luaL_newlib(L, mylib);
+    return 1;
+}
+
+
+
+
+#include "bool_array.h"
+#include "object_capability.h"
 
 int main (int argc, char **argv) {
   int status, result;
@@ -737,13 +760,29 @@ int main (int argc, char **argv) {
     l_message(argv[0], "cannot create state: not enough memory");
     return EXIT_FAILURE;
   }
-//----
+
+    //----
+    lua_pushcfunction(L, print);
+    lua_setglobal(L, "print");
+
+    luaopen_array(L);
+    lua_setglobal(L, "array");
+
+    luaopen_ocap(L);
+    lua_setglobal(L, "ocap");
     //#include "bool_array.h"
 
 
-    lua_pushcfunction(L, l_sin);
-    lua_setglobal(L, "mysin");
-
+//    lua_pushcfunction(L, l_sin);
+//    lua_setglobal(L, "mysin");
+//
+//    lua_pushcfunction(L, helloWord);
+//    lua_setglobal(L, "helloWorld");
+//    luaopen_mylib(L);
+//    lua_pushcfunction(L, luaopen_mylib);
+//    lua_setglobal(L, "openmylib");
+    luaopen_mylib(L);
+    lua_setglobal(L, "mylib");
 
 //-----
 
