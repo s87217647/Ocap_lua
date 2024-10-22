@@ -677,6 +677,7 @@ static void doREPL (lua_State *L) {
 ** Main body of stand-alone interpreter (to be called in protected mode).
 ** Reads the options and handles them all.
 */
+
 static int pmain (lua_State *L) {
   int argc = (int)lua_tointeger(L, 1);
   char **argv = (char **)lua_touserdata(L, 2);
@@ -722,33 +723,6 @@ static int pmain (lua_State *L) {
 }
 
 
-static int l_sin (lua_State *L) {
-    double d = lua_tonumber(L, 1); /* get argument */
-    lua_pushnumber(L, sin(d)); /* push result */
-    return 1; /* number of results */
-}
-
-static int helloWord(lua_State *L){
-    char *str = "Hello world";
-    lua_pushnumber(L, 9);
-    lua_pushstring(L, str);
-    return 2;
-}
-
-static const struct luaL_Reg mylib[] = {
-        {"helloWorld", helloWord},
-        {"mysin", l_sin},
-        {NULL, NULL}
-};
-
-
-int luaopen_mylib (lua_State *L) {
-    luaL_newlib(L, mylib);
-    return 1;
-}
-
-
-
 
 #include "bool_array.h"
 #include "object_capability.h"
@@ -761,30 +735,8 @@ int main (int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-    //----
-    lua_pushcfunction(L, print);
-    lua_setglobal(L, "print");
-
-    luaopen_array(L);
-    lua_setglobal(L, "array");
-
-    luaopen_ocap(L);
-    lua_setglobal(L, "ocap");
-    //#include "bool_array.h"
-
-
-//    lua_pushcfunction(L, l_sin);
-//    lua_setglobal(L, "mysin");
-//
-//    lua_pushcfunction(L, helloWord);
-//    lua_setglobal(L, "helloWorld");
-//    luaopen_mylib(L);
-//    lua_pushcfunction(L, luaopen_mylib);
-//    lua_setglobal(L, "openmylib");
-    luaopen_mylib(L);
-    lua_setglobal(L, "mylib");
-
-//-----
+  ocaping(L);
+  luaopen_array(L);
 
   lua_gc(L, LUA_GCSTOP);  /* stop GC while building state */
   lua_pushcfunction(L, &pmain);  /* to call 'pmain' in protected mode */
