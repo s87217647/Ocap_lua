@@ -20,11 +20,6 @@
 
 // what's a write ocap look like?
 
-typedef struct ocap{
-
-    char* ID;
-    void* ptr;
-}ocap;
 
 typedef struct ocapObj{
     // place holder, one store Lua value object, if it's table, or primitive, or function, a ptr would do
@@ -54,24 +49,121 @@ static int newOcapObj(lua_State *L){
 
     lua_newtable(L);
     refPtr -> capTable = luaL_ref(L, LUA_REGISTRYINDEX);
+
+
+//    lua_createtable(L);
+
+    // setting userdata's metadata to the wrap
+    // maybe wanna do something like this userdata -> middle -> inner
+    // that way, changes can be chained to middle without going to the inner obj
+//    luaL_newmetatable(L, "mt");
+
+    // wanna support his eventually- obj.extraFunc = function() print("something extra") end
+
+//    luaL_newmetatable(L, "middle");
+//    luaL_newmetatable(L, "inner");
+
+    lua_newtable(L);
+    lua_pushstring(L, "__index");
+    lua_pushvalue(L, 1);
+    lua_settable(L, -3);
+
+    lua_pushvalue(L, 2);
+    lua_pushvalue(L, -2);
+    lua_setmetatable(L, -2);
+
+
     lua_pushvalue(L, 2);
     return 1;
 }
 
+//int static payload(lua_State *L){
+////    lua_getglobal(L, "print");
+////    lua_pushstring(L, "surprise is out of the box only if you execute");
+////    lua_pcall(L, 2, 0,0);
+//
+//    printf("Good thing won't happen till payload is out stack size is %d !", lua_gettop(L));
+//
+//    return 0;
+//}
+
+int static jackInTheBox(lua_State *L) {
+    int functionIndex = lua_upvalueindex(1);
+    int capsIndex = lua_upvalueindex(2);
+    int varIndex = 1;
+
+    lua_getfield(L, capsIndex, "io");
+    lua_setglobal(L, "io");
+
+
+    int stackSizeBefore = lua_gettop(L);
+    lua_pushvalue(L, functionIndex);
+    lua_pushvalue(L, varIndex);
+    lua_pcall(L, 1, 10, 0);
+    int stackSizeAfter = lua_gettop(L);
+
+    //return is not yet fully designed
+    return stackSizeAfter - stackSizeBefore;
+}
+int static setCap(lua_State *L){
+    //it's receiving cap, avoiding renaming
+    // the function will be passed to client, then trigger
+    int capsIndex = lua_upvalueindex(1);
+    int keyIndex = 1;
+    int capIndex = 2;
+
+    lua_setfield(L, capsIndex, lua_tostring(L, keyIndex));
+    return 0;
+}
+
+
 
 int static connector(lua_State *L){
-    printf("size of stack is %d", lua_gettop(L));
-    lua_pushvalue(L, lua_upvalueindex(1)); // -> gives the wrapped
-    lua_pushvalue(L, 2);
-    lua_gettable(L, -2);
-//    todo: handle when nothing is found
-    // yeah, I can call this lua function I've got using pcall
-    // how can I get the parameters passed into here?
-    // the only known way so far is to register the function
+    // *------
+    int wrappedIdx = lua_upvalueindex(1);
+    int capsIdx = lua_upvalueindex(2);
+    int wrapIdx = 1;
+    int keyIdx = 2;
+    // *---------
 
+//    lua_pushvalue(L, keyIdx);
+    const char *key = lua_tostring(L, keyIdx);
+//    printf("key is %s ", key);
+
+
+    if(strcmp(key, "caps") == 0){
+        lua_pushvalue(L, capsIdx);
+        return 1;
+    }
+
+
+    if(strcmp(key, "receiveCap") == 0){
+        lua_pushvalue(L, capsIdx);
+        lua_pushcclosure(L, setCap, 1);
+        return 1;
+    }
+
+
+    lua_getfield(L, wrappedIdx, key);
+    if(!lua_isfunction(L, -1)){
+        return  1;
+    }
+    int funcIndex = lua_gettop(L);
+
+
+    lua_pushvalue(L, funcIndex);
+    lua_pushvalue(L, capsIdx);
+    lua_pushcclosure(L, jackInTheBox, 2);
 
     return 1;
 };
+
+int static getCaps(lua_State *L){
+    lua_pushvalue(L, lua_upvalueindex(1));
+    return 1;
+}
+
+
 
 
 static int altNew(lua_State *L){
@@ -83,30 +175,32 @@ static int altNew(lua_State *L){
         return 1;
     }
 
-    lua_newtable(L);
-    lua_pushstring(L, "wrapped");
-    lua_pushvalue(L, 1);
-    lua_settable(L, -3);
+    int wrappedIndex = 1;
 
-    // consider upvaules cap
-    lua_pushstring(L, "caps");
+    //set wrapped
     lua_newtable(L);
-    lua_settable(L, -3);
+    int wrapIndex = lua_gettop(L);
+//    lua_pushstring(L, "wrapped");
+//    lua_pushvalue(L, wrapIndex);
+//    lua_settable(L, -3);
+
+    // wrap.caps = new_table
+
+    lua_newtable(L); int caps_index = lua_gettop(L);
+//    lua_setfield(L, wrapIndex, "caps");
 
 
     // create metatable
-    lua_newtable(L);
-    lua_pushstring(L, "__index");
-//    lua_pushvalue(L, 1);
-    lua_pushvalue(L, 1);
-    lua_pushvalue(L, 2);
+    lua_newtable(L); int mtIndex = lua_gettop(L);
+
+    lua_pushvalue(L, wrappedIndex);
+    lua_pushvalue(L, caps_index);
     lua_pushcclosure(L, connector, 2);
-    lua_settable(L, -3);
-    lua_setmetatable(L, -2);
 
+    lua_setfield(L, mtIndex, "__index"); // mt { "__index" = connector + 2upvals}
+    lua_setmetatable(L, wrapIndex); // setmt(wrap, mt)
 
-    // todo: set up metatable that it 1. set up the environment 2. redirect call to the wrapped
-
+    lua_pushvalue(L, wrapIndex);
     return 1;
 }
 
@@ -123,12 +217,10 @@ static int toWrapped(lua_State *L){
     return 0;
 }
 
-static int run(){
+static int run(lua_State *L){
     // do three things 1, set up the env, execute, reset the env
     // put the resource in
-
-
-
+    lua_pushinteger(L, lua_gettop(L));
 
     return  1;
 }
@@ -225,14 +317,6 @@ static int getCapabilities(lua_State *L){
     return 1;
 }
 
-static int getWrappedObj(lua_State *L){
-    ocapObj  *refPtr = (ocapObj *) lua_touserdata(L, 1);
-
-    lua_pushinteger(L, refPtr->wrappedObj);
-    lua_gettable(L, LUA_REGISTRYINDEX);
-
-    return 1;
-}
 static int tableSize(lua_State *L){
     // first argument need to be a table
 
@@ -308,10 +392,10 @@ static int print(lua_State *L){
 static const struct luaL_Reg OCaplib[] = {
         {"print", print},
         {"newOcapObj", newOcapObj},
-        {"getWrappedObj", getWrappedObj},
         {"ocap", thisIsOcap },
         {"getCapabilities", getCapabilities},
         {"receiveCap", receiveCap},
+        {"run", run},
         //-------------
         {"altNew", altNew},
         {"altReceiveCap", altReceiveCap},
