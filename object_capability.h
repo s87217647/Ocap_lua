@@ -77,29 +77,101 @@ static int newOcapObj(lua_State *L){
     return 1;
 }
 
-//int static payload(lua_State *L){
-////    lua_getglobal(L, "print");
-////    lua_pushstring(L, "surprise is out of the box only if you execute");
-////    lua_pcall(L, 2, 0,0);
-//
-//    printf("Good thing won't happen till payload is out stack size is %d !", lua_gettop(L));
-//
-//    return 0;
-//}
+int static loadEnv(lua_State *L){
+    int capsIndex = 1;
+    // use this table to keep the replaced var from elements
+    // later restore it
+    lua_newtable(L); int replacedIndex = lua_gettop(L);
+
+    lua_pushnil(L);
+    while(lua_next(L, capsIndex) != 0){
+        int valIndex = lua_gettop(L);
+        int keyIndex = valIndex -1;
+
+        // if key exists in _G already, put it in the replaced
+
+        char *key = lua_tostring(L, keyIndex);
+        lua_getglobal(L, key);
+        if(lua_isnil(L, -1)){
+            lua_pop(L, 1);
+        }else{
+            // note that two level reference need two steps
+            lua_setfield(L, replacedIndex, key);
+        }
+        lua_pushvalue(L, valIndex);
+        lua_setglobal(L, key);
+
+        lua_pop(L, 1);
+    }
+
+    lua_pushvalue(L, replacedIndex);
+    return 1;
+
+}
+
+int static cleanEnv(lua_State *L){
+    int capsIndex = lua_gettop(L);
+    int theReplaced = capsIndex - 1;
+    // set all caps.val = nil
+
+    lua_pushnil(L);
+    while(lua_next(L, capsIndex) != 0){
+        int keyIdx = lua_gettop(L) - 1;
+        int valIdx = lua_gettop(L);
+
+        char *key = lua_tostring(L, keyIdx);
+        lua_pushnil(L);
+        lua_setglobal(L, key);
+
+        lua_pop(L, 1);
+    }
+
+    // put the overwritten ones
+
+    lua_pushnil(L);
+    while(lua_next(L, theReplaced)){
+        int keyIdx = lua_gettop(L) - 1;
+        int valIdx = lua_gettop(L);
+
+        lua_pushvalue(L, valIdx);
+        lua_setglobal(L, lua_tostring(L, keyIdx));
+
+        lua_pop(L, 1);
+    }
+
+
+    return 0;
+};
+
 
 int static jackInTheBox(lua_State *L) {
     int functionIndex = lua_upvalueindex(1);
     int capsIndex = lua_upvalueindex(2);
     int varIndex = 1;
+    int numVars = lua_gettop(L);
 
-    lua_getfield(L, capsIndex, "io");
-    lua_setglobal(L, "io");
+    lua_pushcfunction(L, loadEnv);
+    lua_pushvalue(L, capsIndex);
+    lua_pcall(L, 1, 1, 0);
+    int replacedIdx = lua_gettop(L);
 
 
     int stackSizeBefore = lua_gettop(L);
     lua_pushvalue(L, functionIndex);
     lua_pushvalue(L, varIndex);
-    lua_pcall(L, 1, 10, 0);
+    lua_pcall(L, numVars, 10, 0);
+    while(lua_isnil(L, -1)){
+        lua_pop(L, 1);
+    }
+
+
+    //todo: clean nil
+
+    lua_pushcfunction(L, cleanEnv);
+    lua_pushvalue(L,replacedIdx);
+    lua_pushvalue(L, capsIndex);
+    lua_pcall(L, 2, 0, 0);
+
     int stackSizeAfter = lua_gettop(L);
 
     //return is not yet fully designed
@@ -116,6 +188,11 @@ int static setCap(lua_State *L){
     return 0;
 }
 
+// The way I am treating this connector and functions
+// it invokes is almost like object oriented programming
+// Given each function parameters it needs (sorta like vars associated with class)then pass it
+// user passes other parameters into the wrapping function
+// then, it load env, then execute
 
 
 int static connector(lua_State *L){
@@ -150,7 +227,6 @@ int static connector(lua_State *L){
     }
     int funcIndex = lua_gettop(L);
 
-
     lua_pushvalue(L, funcIndex);
     lua_pushvalue(L, capsIdx);
     lua_pushcclosure(L, jackInTheBox, 2);
@@ -162,8 +238,6 @@ int static getCaps(lua_State *L){
     lua_pushvalue(L, lua_upvalueindex(1));
     return 1;
 }
-
-
 
 
 static int altNew(lua_State *L){
