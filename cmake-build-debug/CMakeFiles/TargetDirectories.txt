@@ -1,0 +1,3 @@
+/Users/swift/Lua_ocap/Ocap_lua/cmake-build-debug/CMakeFiles/Ocap_lua.dir
+/Users/swift/Lua_ocap/Ocap_lua/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/swift/Lua_ocap/Ocap_lua/cmake-build-debug/CMakeFiles/rebuild_cache.dir

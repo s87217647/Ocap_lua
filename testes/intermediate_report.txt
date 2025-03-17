@@ -1,0 +1,145 @@
+---- third party code, verify credit card #, but no internet IO
+---- in abstract execute a code we don't trust with limited authority
+---- but then, simple sandbox will do
+---- so, what it looks like
+--- part 1: without any restriction
+
+--- let's say for now, the valid credit card number is just 15, 16, digits #
+
+str1 = "1234 5678 2234 5678"
+str2 = "1234 5678 2234 567"
+str3 = "aaaa"
+
+verifier = {
+    val = "value from verifier";
+
+    isValid = function(str)
+        digitsCount = 0
+
+        for i = 1, #str do
+            char = string.sub(str, i, i);
+            if tonumber(char) ~= nil then
+                digitsCount = digitsCount + 1
+            end
+        end
+
+        return digitsCount == 15 or digitsCount == 16
+    end;
+
+
+    goodFunc = function(num)
+        print("sqrt of input is: ", math.sqrt(num))
+    end,
+
+    evilFunc = function(str)
+        -- do evil shit
+        --local socket = require("socket")
+        --for simplicity sake, write to a file
+        file = io.open("./f.txt", "a+")
+        io.output(file)
+        io.write(str.. " from the evil function \r")
+        io.close(file)
+    end
+}
+
+
+
+
+
+print(verifier.isValid(str1)) -- verifying
+verifier.evilFunc(str1)
+
+
+--- Part 2, sandbox
+-- 2.1 lua native sand box
+    -- Define a safe environment
+local sandbox_env = {
+    print = print,
+    tonumber = tonumber,
+    tostring = tostring,
+    math = {
+        abs = math.abs,
+        sqrt = math.sqrt,
+        floor = math.floor
+    },
+    table = {
+        insert = table.insert,
+        remove = table.remove
+    },
+    _G = nil  -- Disable access to the global environment
+}
+
+-- Remove dangerous libraries
+sandbox_env.os = nil
+sandbox_env.io = nil
+sandbox_env.debug = nil
+sandbox_env.package = nil
+
+-- User-provided code to be executed in the sandbox
+
+
+local safe_code = [[
+    print("This is a safe sandbox!")
+    print(math.sqrt(49))
+]]
+
+local risky_code = [[
+        file = io.open("./f.txt", "a+")
+        io.output(file)
+        io.write("love from risky code\r")
+        io.close(file)
+]]
+
+-- Load the user code into a sandbox
+local boxedSafe, err1 = load(safe_code, "sandbox", "t", sandbox_env)
+local boxedRisky, err2 = load(risky_code, "sandbox", "t", sandbox_env)
+
+boxedSafe()
+--boxedRisky()
+
+
+--- part3 ---- ocap
+
+--- do something before falling back
+    print("do something before returning the key")
+
+wrappedV2 = {}
+
+function connector(table, key, fallback)
+    return fallback[key]
+end
+
+mt = {__index = function(tbl, key) return handler(tbl, key, verifier) end}
+setmetatable(wrappedV2, mt)
+print(wrappedV2.evilFunc("2355 pure evil stuff"))
+
+
+--- Set up _ENV
+wrappedV = ocap.altNew(verifier)
+print(ocap.altReceiveCap(wrappedV, "io", io))
+os = nil
+
+wrappedV.goodFunc(49)
+wrappedV.evilFunc("Something evil")
+
+
+setUpEnvRt = ocap.setUpEnv(wrappedV)
+-- let's say it return the _env it uses internally, it should have the valid os
+-- I can mess with _ENV however I like, coz I can use _G to restore it
+-- or add it, then delete it
+-- add os back to _ENV
+
+
+print("_ENV", _ENV)
+print(setUpEnvRt) -- yes, now it sets up the local _ENV without affecting the global one
+
+local somethingShouldNotBeInG = "not in G"
+--print(_ENV.somethingShouldNotBeInG)
+
+--print("The _ENV")
+--printTable(_ENV)
+--
+--print("The _G")
+--printTable(_ENV._G)
+
+print("End of Env setup")
