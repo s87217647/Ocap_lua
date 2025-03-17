@@ -7,5 +7,4 @@ include_directories(.)
 include_directories(testes)
 
 add_executable(Ocap_lua
-
-        onelua.c bool_array.h object_capability.h)
+        onelua.c bool_array.h src/object_capability.h)

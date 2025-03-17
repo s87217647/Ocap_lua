@@ -16,6 +16,8 @@
 #include "lauxlib.h"
 #include "lualib.h"
 #include "llimits.h"
+// instead of load and clean environment, why not use local upvalue?
+
 
 int static loadEnv(lua_State *L){
     int capsIndex = 1;
@@ -124,14 +126,14 @@ int static setCap(lua_State *L){
     return 0;
 }
 
-// The way I am treating this connector and functions
+// The way I am treating this handler and functions
 // it invokes is almost like object oriented programming
 // Given each function parameters it needs (sorta like vars associated with class)then pass it
 // user passes other parameters into the wrapping function
 // then, it load env, then execute
 
 
-int static connector(lua_State *L){
+int static handler(lua_State *L){
     // *------
     int wrappedIdx = lua_upvalueindex(1);
     int capsIdx = lua_upvalueindex(2);
@@ -180,44 +182,29 @@ static int altNew(lua_State *L){
     //first var is the wrapped
     // create new table, wrapped & caps
     // __ index is set to wrapped
-    if (!lua_istable(L, 1)) {
+    int fallBackTableIndex = lua_gettop(L);
+    if (!lua_istable(L, fallBackTableIndex)) {
         luaL_error(L, "Expected a table as the first argument");
         return 1;
     }
 
-    int wrappedIndex = 1;
 
-    //set wrapped
-    lua_newtable(L);
-    int wrapIndex = lua_gettop(L);
-//    lua_pushstring(L, "wrapped");
-//    lua_pushvalue(L, wrapIndex);
-//    lua_settable(L, -3);
 
-    // wrap.caps = new_table
-
+    lua_newtable(L); int oCapObjIndex = lua_gettop(L);
     lua_newtable(L); int caps_index = lua_gettop(L);
-//    lua_setfield(L, wrapIndex, "caps");
-
-
-    // create metatable
     lua_newtable(L); int mtIndex = lua_gettop(L);
+//    lua_newtable(L);
 
-    lua_pushvalue(L, wrappedIndex);
+    lua_pushvalue(L, fallBackTableIndex);
     lua_pushvalue(L, caps_index);
-    lua_pushcclosure(L, connector, 2);
+    lua_pushcclosure(L, handler, 2);
 
-    lua_setfield(L, mtIndex, "__index"); // mt { "__index" = connector + 2upvals}
-    lua_setmetatable(L, wrapIndex); // setmt(wrap, mt)
+    lua_setfield(L, mtIndex, "__index"); // mt { "__index" = handler + 2upvals}
 
-    lua_pushvalue(L, wrapIndex);
+    lua_setmetatable(L, oCapObjIndex); // setmt(wrap, mt)
+
+    lua_pushvalue(L, oCapObjIndex);
     return 1;
-}
-
-static int altaltNew(lua_State *L){
-//    return a function with 2 up values that are wrapped and cap?
-
-
 }
 
 
@@ -241,8 +228,14 @@ static int tableSize(lua_State *L){
     return 1;
 }
 
+static int introduction(lua_State *L){
+    // take in two caps object A, B
 
-static const struct luaL_Reg OCaplib[] = {
+
+    return 0;
+}
+
+static const struct luaL_Reg oCapLib[] = {
         {"run", run},
         //-------------
         {"altNew", altNew},
@@ -250,20 +243,12 @@ static const struct luaL_Reg OCaplib[] = {
         {NULL, NULL},
 };
 
-int luaopen_ocap(lua_State *L){
-    luaL_newlib(L, OCaplib);
-    return 1;
-};
 
-int ocaping(lua_State *L){
-    // Handler, called in main
-    //----
-    luaopen_array(L);
-    lua_setglobal(L, "array");
 
-    luaopen_ocap(L);
+
+int register_ocap_lib(lua_State *L){
+    luaL_newlib(L, oCapLib);
     lua_setglobal(L, "ocap");
-    lua_setglobal(L, "mylib");
 }
 
 #endif //OCAP_LUA_OBJECT_CAPABILITY_H

@@ -725,7 +725,7 @@ static int pmain (lua_State *L) {
 
 
 #include "bool_array.h"
-#include "object_capability.h"
+#include "src/object_capability.h"
 
 int main (int argc, char **argv) {
   int status, result;
@@ -734,9 +734,7 @@ int main (int argc, char **argv) {
     l_message(argv[0], "cannot create state: not enough memory");
     return EXIT_FAILURE;
   }
-
-  ocaping(L);
-  luaopen_array(L);
+    register_ocap_lib(L);
 
   lua_gc(L, LUA_GCSTOP);  /* stop GC while building state */
   lua_pushcfunction(L, &pmain);  /* to call 'pmain' in protected mode */
