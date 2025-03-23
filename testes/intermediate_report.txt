@@ -115,7 +115,7 @@ print(wrappedV2.evilFunc("2355 pure evil stuff"))
 
 
 --- Set up _ENV
-wrappedV = ocap.altNew(verifier)
+wrappedV = ocap.ocapify(verifier)
 print(ocap.altReceiveCap(wrappedV, "io", io))
 os = nil
 

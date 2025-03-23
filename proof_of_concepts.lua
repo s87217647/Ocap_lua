@@ -19,17 +19,16 @@ print(verifier.isValid(str3))
 verifier.evilIsValid("To the file")
 
 -----
-obj = ocap.altNew(verifier)
-obj2 = ocap.altNew(verifier)
---
---printTable(obj)
+---
 
-obj.receiveCap("io", io)
+obj = ocap.ocapify(verifier)
+obj2 = ocap.ocapify(verifier)
 
-io = nil
+print(obj.env)
+--print(obj2.env)
 
-print(obj2.evilIsValid("from obj2, shouldn't be on file at all"))
-print(obj.evilIsValid("from obj, have io access, should be on file"))
+print(obj.evilIsValid("ocapified obj1"))
+print(obj2.evilIsValid("ocapified obj2"))
 
 
 --- conclusion obj2, without IO, unable to perform

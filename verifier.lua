@@ -12,7 +12,7 @@
 
 
 verifier = {
-    val = "value from verifier";
+    val = "val of verifier";
 
     isValid = function(str)
         digitsCount = 0
@@ -36,7 +36,6 @@ verifier = {
     end,
 
     evilFunc = function(str)
-        -- do evil shit
         --local socket = require("socket")
         --for simplicity sake, write to a file
         file = io.open("./f.txt", "a+")

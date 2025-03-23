@@ -725,7 +725,7 @@ static int pmain (lua_State *L) {
 
 
 #include "bool_array.h"
-#include "src/object_capability.h"
+#include "object_capability.h"
 
 int main (int argc, char **argv) {
   int status, result;
