@@ -5,30 +5,73 @@
 ---
 --- Eventually, comming back to struct & reference based lua
 --- coz other way is just not gonna work
-
-
 require("verifier")
 
 str1 = "1234 5678 2234 5678"
 str2 = "1234 5678 2234 567"
 str3 = "aaaa"
 
-print(verifier.isValid(str1))
-print(verifier.isValid(str3))
+-- Test if verifier works
+assert(verifier.isValid(str1))
+assert(verifier.isValid(str2))
+assert(verifier.isValid(str3) == false)
 
-verifier.evilIsValid("To the file")
+-- Test malicious function
+function get_last_line(filename)
+    local file = io.open(filename, "r")
+    if not file then return nil end
 
------
----
+    local lastLine
+    for line in file:lines() do
+        lastLine = line
+    end
 
+    file:close()
+    return lastLine:gsub("[%s\r\n]+$", "")
+end
+
+s = "To the file from evil validation function\n"
+verifier.evilIsValid(s)
+--print(get_last_line("././f.txt"))
+--print(s)
+
+assert(get_last_line("./f.txt") == s:gsub("[%s\r\n]+$", ""))
+
+
+---testcases
+assert(ocap.ocapify)
+
+--- ocapified obj is not the original one
 obj = ocap.ocapify(verifier)
 obj2 = ocap.ocapify(verifier)
-
-print(obj.env)
---print(obj2.env)
-
-print(obj.evilIsValid("ocapified obj1"))
-print(obj2.evilIsValid("ocapified obj2"))
+assert(not (obj == verifier))
+assert(not (obj2 == verifier))
 
 
---- conclusion obj2, without IO, unable to perform
+--- basic function test
+assert(obj.receiveCap)
+assert(obj.removeCap)
+
+
+--- obj receive cap, obj2 does not
+--ioBackup = io
+--io = nil;
+assert(obj.receiveCap(io.write, "io.write"))
+obj.receiveCap(io, "io")
+
+
+
+
+
+--assert(obj.receiveCap(io.write, "io.write"))
+
+--assert(obj.receiveCap(io.open) == "io.open")
+
+
+--- both ocapified object calling evil func
+--- input for obj should be on the file, while the obj2 should not
+print(obj.evilIsValid("Str for obj1\r"))
+print(obj2.evilIsValid("String for obj2?\r"))
+
+--assert(io == ioBackup)
+

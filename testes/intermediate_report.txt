@@ -105,7 +105,7 @@ boxedSafe()
 
 wrappedV2 = {}
 
-function connector(table, key, fallback)
+function handler(table, key, fallback)
     return fallback[key]
 end
 

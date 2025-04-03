@@ -345,7 +345,7 @@ LUA_API int lua_rawequal (lua_State *L, int index1, int index2) {
 LUA_API void lua_arith (lua_State *L, int op) {
   lua_lock(L);
   if (op != LUA_OPUNM && op != LUA_OPBNOT)
-    api_checkpop(L, 2);  /* all other operations expect two operands */
+    api_checkpop(L, 2);  /*   ,lkm,lml   all other operations expect two operands */
   else {  /* for unary operations, add fake 2nd operand */
     api_checkpop(L, 1);
     setobjs2s(L, L->top.p, L->top.p - 1);

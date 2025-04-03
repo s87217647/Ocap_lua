@@ -16,7 +16,6 @@
 #include "lauxlib.h"
 #include "lualib.h"
 #include "llimits.h"
-// instead of load and clean environment, why not use local upvalue?
 
 
 static int printTable(lua_State *L, int index){
@@ -49,125 +48,204 @@ static int printTable(lua_State *L, int index){
 }
 
 
-// it is the mini prison, loads up environment, execute, restore environment
+int static loadEnv(lua_State *L){
+    int capsIndex = 1;
+    // Table for keeping replaced elements, for future restoring
+    lua_newtable(L); int replacedIndex = lua_gettop(L);
 
-static const luaL_Reg safe_funcs[] = {
-    {LUA_GNAME, luaopen_base},
-    {LUA_LOADLIBNAME, luaopen_package},
-    {LUA_COLIBNAME, luaopen_coroutine},
-    {LUA_DBLIBNAME, luaopen_debug},
-    {LUA_IOLIBNAME, luaopen_io},
-    {LUA_MATHLIBNAME, luaopen_math},
-    {LUA_OSLIBNAME, luaopen_os},
-    {LUA_STRLIBNAME, luaopen_string},
-    {LUA_TABLIBNAME, luaopen_table},
-    {LUA_UTF8LIBNAME, luaopen_utf8},
-    {NULL, NULL}
-};
+    // remove dangerous resources, put in restoring table
 
+    lua_getglobal(L, "io"); int ioIdx = lua_gettop(L);
 
-#define MAX_RETURN 32
+    lua_pushvalue(L, ioIdx);
+    lua_setfield(L, replacedIndex, "io");
 
-// The name is because only when it gets activated by ()
-// It starts executes functions and return
-// otherwise, it sits there, like a box with jack in it
-int static jackInTheBox(lua_State *L) {
-    lua_pushstring(L, "box activated");
-    l_print(L);
-
-    int functionIndex = lua_upvalueindex(1);
-    int oCapEnvIdx = lua_upvalueindex(2);
-    int inputSize = lua_gettop(L);
-
-    // Later restoring _G
-    lua_rawgeti(L,LUA_REGISTRYINDEX, LUA_RIDX_GLOBALS);
-    int outsideEnvIdx = lua_gettop(L);
-
-//    lua_pushglobaltable(L);
-//    l_print(L);
-//
-//    lua_getglobal(L, "_G");
-//    l_print(L);
-
-    // Set env to this objects's
-    lua_pushvalue(L, oCapEnvIdx);
-    lua_rawseti(L, LUA_REGISTRYINDEX, LUA_RIDX_GLOBALS);
-    luaopen_base(L);
-
-
+    // set io =
     lua_pushnil(L);
     lua_setglobal(L, "io");
 
+    // put in given resources
+    lua_getfield(L,capsIndex, "io.open"); int resourcesIdx = lua_gettop(L);
 
-
-    int stackSize = lua_gettop(L);
-    lua_pushvalue(L, functionIndex);
-    //push all the input back on top
-    for(int i = 1; i <= inputSize; i++){
-        lua_pushvalue(L, i);
+    if (!lua_isnil(L, lua_gettop(L))){
+        lua_pushvalue(L, ioIdx);
+        lua_setglobal(L, "io");
     }
-    lua_pcall(L, inputSize, MAX_RETURN, 0);
 
-    // remove Nil Paddings
+
+
+
+
+//    lua_pushnil(L);
+//    while(lua_next(L, capsIndex) != 0){
+//        int valIndex = lua_gettop(L);
+//        int keyIndex = valIndex -1;
+//
+//        // if key exists in _G already, put it in the replaced
+//
+//        char *key = lua_tostring(L, keyIndex);
+//        lua_getglobal(L, key);
+//        if(lua_isnil(L, -1)){
+//            lua_pop(L, 1);
+//        }else{
+//            // note that two level reference need two steps
+//            lua_setfield(L, replacedIndex, key);
+//        }
+//        lua_pushvalue(L, valIndex);
+//        lua_setglobal(L, key);
+//
+//        lua_pop(L, 1);
+//    }
+//
+//    lua_pushvalue(L, replacedIndex);
+
+lua_pushvalue(L, replacedIndex);
+    return 1;
+
+}
+
+int static cleanEnv(lua_State *L){
+    int replacedIdx = 1;
+    int capsIndex = 2;
+    // don't need caps, just set the global back to the replaces
+
+
+    lua_pushnil(L);
+    while(lua_next(L, replacedIdx)){
+        int keyIdx = lua_gettop(L) - 1;
+        int valIdx = lua_gettop(L);
+
+        printf(L, lua_tostring(L, keyIdx));
+        lua_pushvalue(L, valIdx);
+        lua_setglobal(L, lua_tostring(L, keyIdx));
+
+        lua_pop(L, 1);
+    }
+
+    lua_pushboolean(L, 1);
+    return 1;
+};
+
+
+int static jackInTheBox(lua_State *L) {
+    printf("box is activated");
+
+    int functionIndex = lua_upvalueindex(1);
+    int capsIndex = lua_upvalueindex(2);
+    int varIndex = 1;
+    int numVars = lua_gettop(L);
+
+    lua_pushcfunction(L, loadEnv);
+    lua_pushvalue(L, capsIndex);
+    lua_pcall(L, 1, 1, 0);
+    int replacedIdx = lua_gettop(L);
+    printTable(L, replacedIdx);
+
+
+    int stackSizeBefore = lua_gettop(L);
+    lua_pushvalue(L, functionIndex);
+    lua_pushvalue(L, varIndex);
+    lua_pcall(L, numVars, 10, 0);
     while(lua_isnil(L, -1)){
         lua_pop(L, 1);
     }
 
-    lua_pushvalue(L, outsideEnvIdx);
-    lua_rawseti(L, LUA_REGISTRYINDEX, LUA_RIDX_GLOBALS);
-    return lua_gettop(L) - stackSize;
+
+    //todo: clean nil
+    lua_pushcfunction(L, cleanEnv);
+    lua_pushvalue(L,replacedIdx);
+    lua_pushvalue(L, capsIndex);
+    lua_pcall(L, 2, 0, 0);
+
+    int stackSizeAfter = lua_gettop(L);
+
+    //return is not yet fully designed
+    return stackSizeAfter - stackSizeBefore;
 }
 
 
-// handler - act as a proxy, redirect all traffic through this function
-// other than special key worlds, it's either getting value from the inner obj, or function execution
-// function execution is redirected to  the jack in the box
-// load the environment, before return a value or execute a function
-// need to return the values as an ocap obj, which is a new wrap? but they can share the same wrap, right?
-// that's for the later
-int static handler(lua_State *L){
-    // *------
-    int innerObjIdx = lua_upvalueindex(1);
-    int envIdx = lua_upvalueindex(2);
+int static receiveCap(lua_State *L){
+    int capsIndex = lua_upvalueindex(1);
+    int resourceIdx = 1;
+    int pathIdx = 2;
 
+
+    char *path = lua_tostring(L, pathIdx);
+    char *token = strtok(path, ".");
+    char *next = strtok(NULL, ".");
+
+
+    lua_pushvalue(L, capsIndex);
+
+    while(next != NULL){
+//        printf("path %s, tk %s, nxt %s", path, token, next);
+        lua_getfield(L, capsIndex, token);
+
+        if(lua_isnil(L, -1)){
+            lua_pop(L, -1);
+            lua_newtable(L);
+            lua_pushvalue(L, -1);
+            lua_setfield(L, capsIndex, token);
+            capsIndex = lua_gettop(L);
+        }
+        token = next;
+        next = strtok(NULL, ".");
+    }
+
+
+
+    lua_pushvalue(L, resourceIdx);
+    lua_setfield(L, capsIndex, token);
+    lua_pushboolean(L, 1);
+    return 1;
+
+}
+
+// The way I am treating this handler and functions
+// it invokes is almost like object oriented programming
+// Given each function parameters it needs (sorta like vars associated with class)then pass it
+// user passes other parameters into the wrapping function
+// then, it load env, then execute
+
+
+int static handler(lua_State *L){
+    int indsideObjIdx = lua_upvalueindex(1);
+    int capsIdx = lua_upvalueindex(2);
     int wrapIdx = 1;
     int keyIdx = 2;
-    // *---------
 
     const char *key = lua_tostring(L, keyIdx);
 
-    // special keywords
-    if(strcmp(key, "env") == 0){
-        lua_pushvalue(L, envIdx);
-        return 1;
-    }
-    if(strcmp(key, "inside") == 0){
-        lua_pushvalue(L, innerObjIdx);
+    if(strcmp(key, "caps") == 0){
+        lua_pushvalue(L, capsIdx);
         return 1;
     }
 
-    if(strcmp(key, "addCap") == 0){
-
+    if(strcmp(key, "receiveCap") == 0){
+        lua_pushvalue(L, capsIdx);
+        lua_pushcclosure(L, receiveCap, 1);
+        return 1;
     }
 
     if(strcmp(key, "removeCap") == 0){
-
+        lua_pushboolean(L, 1);
+        return 1;
     }
 
-    lua_getfield(L, innerObjIdx, key);
+    lua_getfield(L, indsideObjIdx, key);
 
-    // val from inner object is  not a function
-    // todo: return objects as ocaped obj
+    //results comes back a table or primitive
     if(!lua_isfunction(L, -1)){
+        // todo: if it table, return it as an ocaped obj
         return  1;
     }
 
-    // It's a function, return the box with Jack in it
+    // results comes back a function
     int funcIndex = lua_gettop(L);
-    lua_pushvalue(L, funcIndex);
-    lua_pushvalue(L, envIdx);
-    lua_pushcclosure(L, jackInTheBox, 2);
 
+    lua_pushvalue(L, funcIndex);
+    lua_pushvalue(L, capsIdx);
+    lua_pushcclosure(L, jackInTheBox, 2);
 
     return 1;
 };
@@ -177,55 +255,62 @@ int static getCaps(lua_State *L){
     return 1;
 }
 
-// This function create an ocapified object
-// An table surround the original object, carrying it's own environment
-// deprived of outside environment accessibility
 
 static int ocapify(lua_State *L){
-    int innerObjIdx = lua_gettop(L);
-    if (!lua_istable(L, innerObjIdx)) {
-        luaL_error(L, "Expecting object");
+    //first var is the wrapped
+    // create new table, wrapped & caps
+    // __ index is set to wrapped
+    if (!lua_istable(L, 1)) {
+        luaL_error(L, "Expecting Table");
         return 1;
     }
 
-    lua_newtable(L); int envIdx = lua_gettop(L);
-    luaL_setfuncs(L,safe_funcs, 0);
+    int objIdx = 1;
 
-    lua_newtable(L); int outsideObjIdx = lua_gettop(L);
+    lua_newtable(L); int ocapedObjIdx = lua_gettop(L);
+    lua_newtable(L); int capsIdx = lua_gettop(L);
     lua_newtable(L); int mtIndex = lua_gettop(L);
 
-    lua_pushvalue(L, innerObjIdx);
-    lua_pushvalue(L, envIdx);
+    lua_pushvalue(L, objIdx);
+    lua_pushvalue(L, capsIdx);
     lua_pushcclosure(L, handler, 2);
 
-    lua_setfield(L, mtIndex, "__index"); // mt { "__index" = handler + 2 upvals}
-    lua_setmetatable(L, outsideObjIdx); // setmt(wrap, mt)
+    lua_setfield(L, mtIndex, "__index"); // mt { "__index" = handler + 2upvals}
+    lua_setmetatable(L, ocapedObjIdx); // setmt(wrap, mt)
 
-    lua_pushvalue(L, outsideObjIdx);
+    lua_pushvalue(L, ocapedObjIdx);
     return 1;
 }
 
 
-
-static int tableSize(lua_State *L){
-    // first argument need to be a table
-
-    return 1;
-}
-
-
-static const struct luaL_Reg oCapLib[] = {
-        {"ocapify", ocapify},
+static const struct luaL_Reg OCaplib[] = {
+        {"ocapify",    ocapify},
 
         {NULL, NULL},
 };
 
 
-
-
-int register_ocap_lib(lua_State *L){
-    luaL_newlib(L, oCapLib);
+int luaopen_ocap(lua_State *L){
+    luaL_newlib(L, OCaplib);
     lua_setglobal(L, "ocap");
+    return 1;
+};
+
+
+static int helloWord(lua_State *L){
+    char *str = "Hello world";
+    lua_pushnumber(L, 9);
+    lua_pushstring(L, str);
+    return 2;
 }
+
+
+
+
+
+
+
+
+
 
 #endif //OCAP_LUA_OBJECT_CAPABILITY_H

@@ -40,7 +40,7 @@ verifier = {
         --for simplicity sake, write to a file
         file = io.open("./f.txt", "a+")
         io.output(file)
-        io.write(str.. " from the evil function \r")
+        io.write(str)
         io.close(file)
     end;
 
