@@ -5,6 +5,24 @@
 ---
 --- Eventually, comming back to struct & reference based lua
 --- coz other way is just not gonna work
+
+-- to delete
+a = {
+    val = "a";
+    func = function()
+        print(io)
+        print("printing")
+    end
+}
+
+a = ocap.ocapify(a)
+a.func()
+
+-- to delete
+
+
+
+
 require("verifier")
 
 str1 = "1234 5678 2234 5678"
@@ -12,9 +30,9 @@ str2 = "1234 5678 2234 567"
 str3 = "aaaa"
 
 -- Test if verifier works
-assert(verifier.isValid(str1))
-assert(verifier.isValid(str2))
-assert(verifier.isValid(str3) == false)
+assert(verifier.valid(str1))
+assert(verifier.valid(str2))
+assert(verifier.valid(str3) == false)
 
 -- Test malicious function
 function get_last_line(filename)
@@ -31,7 +49,7 @@ function get_last_line(filename)
 end
 
 s = "To the file from evil validation function\n"
-verifier.evilIsValid(s)
+verifier.isValid(s)
 --print(get_last_line("././f.txt"))
 --print(s)
 
@@ -39,6 +57,7 @@ assert(get_last_line("./f.txt") == s:gsub("[%s\r\n]+$", ""))
 
 
 ---testcases
+assert(ocap)
 assert(ocap.ocapify)
 
 --- ocapified obj is not the original one
@@ -56,22 +75,29 @@ assert(obj.removeCap)
 --- obj receive cap, obj2 does not
 --ioBackup = io
 --io = nil;
+--for k, v in pairs(_G) do print(k,v) end
+
 assert(obj.receiveCap(io.write, "io.write"))
-obj.receiveCap(io, "io")
+obj.receiveCap(io.output, "io.output")
+obj.receiveCap(io.open, "io.open")
+obj.receiveCap(io.close, "io.close")
 
 
+--obj.receiveCap(io, "io")
+
+--for k, v in pairs(obj.caps.io) do print(k, v) end
 
 
-
---assert(obj.receiveCap(io.write, "io.write"))
-
---assert(obj.receiveCap(io.open) == "io.open")
+--obj.receiveCap(io, "io")
+--assert(obj.caps.io == io)
 
 
 --- both ocapified object calling evil func
 --- input for obj should be on the file, while the obj2 should not
-print(obj.evilIsValid("Str for obj1\r"))
-print(obj2.evilIsValid("String for obj2?\r"))
+
+print(obj.isValid(str3))
+print(obj2.isValid(str3))
+
+--x = require(socket)
 
 --assert(io == ioBackup)
-

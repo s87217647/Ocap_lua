@@ -47,6 +47,16 @@ static int printTable(lua_State *L, int index){
     return 0;
 }
 
+static const luaL_Reg danger[] = {
+        {"io", iolib},
+        {"os", syslib},
+        {"debug", dblib},
+        {"load", luaB_load},
+        {"loadfile", luaB_loadfile},
+//        {"require", luaL_requiref},
+        {NULL, NULL}
+};
+
 
 int static loadEnv(lua_State *L){
     int capsIndex = 1;
@@ -54,60 +64,45 @@ int static loadEnv(lua_State *L){
     lua_newtable(L); int replacedIndex = lua_gettop(L);
 
     // remove dangerous resources, put in restoring table
-
-    lua_getglobal(L, "io"); int ioIdx = lua_gettop(L);
-
-    lua_pushvalue(L, ioIdx);
-    lua_setfield(L, replacedIndex, "io");
-
-    // set io =
-    lua_pushnil(L);
-    lua_setglobal(L, "io");
-
-    // put in given resources
-    lua_getfield(L,capsIndex, "io.open"); int resourcesIdx = lua_gettop(L);
-
-    if (!lua_isnil(L, lua_gettop(L))){
-        lua_pushvalue(L, ioIdx);
-        lua_setglobal(L, "io");
+    for(const luaL_Reg  *lib = danger; lib->name != NULL; lib ++){
+        lua_getglobal(L, lib->name);
+        lua_setfield(L, replacedIndex, lib->name);
+        lua_pushnil(L);
+        lua_setglobal(L, lib->name);
     }
 
+    //put given resources in global env
+    lua_pushnil(L);
+    while(lua_next(L, capsIndex) != 0){
+        int valIndex = lua_gettop(L);
+        int keyIndex = valIndex -1;
+
+        // if key exists in _G already, put it in the replaced
+        char *key = lua_tostring(L, keyIndex);
+        lua_getglobal(L, key);
 
 
+        if(lua_isnil(L, -1)){
+            lua_pop(L, 1);
+        }else{
+            // note that two level reference need two steps
+            lua_setfield(L, replacedIndex, key);
+        }
+        lua_pushvalue(L, valIndex);
+        lua_setglobal(L, key);
+        lua_pop(L, 1);
+    }
 
+//    lua_getglobal(L, "io");
+//    printTable(L, lua_gettop(L));
 
-//    lua_pushnil(L);
-//    while(lua_next(L, capsIndex) != 0){
-//        int valIndex = lua_gettop(L);
-//        int keyIndex = valIndex -1;
-//
-//        // if key exists in _G already, put it in the replaced
-//
-//        char *key = lua_tostring(L, keyIndex);
-//        lua_getglobal(L, key);
-//        if(lua_isnil(L, -1)){
-//            lua_pop(L, 1);
-//        }else{
-//            // note that two level reference need two steps
-//            lua_setfield(L, replacedIndex, key);
-//        }
-//        lua_pushvalue(L, valIndex);
-//        lua_setglobal(L, key);
-//
-//        lua_pop(L, 1);
-//    }
-//
-//    lua_pushvalue(L, replacedIndex);
-
-lua_pushvalue(L, replacedIndex);
+    lua_pushvalue(L, replacedIndex);
     return 1;
-
 }
 
 int static cleanEnv(lua_State *L){
     int replacedIdx = 1;
     int capsIndex = 2;
-    // don't need caps, just set the global back to the replaces
 
 
     lua_pushnil(L);
@@ -115,7 +110,7 @@ int static cleanEnv(lua_State *L){
         int keyIdx = lua_gettop(L) - 1;
         int valIdx = lua_gettop(L);
 
-        printf(L, lua_tostring(L, keyIdx));
+//        printf(L, lua_tostring(L, keyIdx));
         lua_pushvalue(L, valIdx);
         lua_setglobal(L, lua_tostring(L, keyIdx));
 
@@ -126,10 +121,7 @@ int static cleanEnv(lua_State *L){
     return 1;
 };
 
-
-int static jackInTheBox(lua_State *L) {
-    printf("box is activated");
-
+int static customizedSandbox(lua_State *L) {
     int functionIndex = lua_upvalueindex(1);
     int capsIndex = lua_upvalueindex(2);
     int varIndex = 1;
@@ -139,8 +131,6 @@ int static jackInTheBox(lua_State *L) {
     lua_pushvalue(L, capsIndex);
     lua_pcall(L, 1, 1, 0);
     int replacedIdx = lua_gettop(L);
-    printTable(L, replacedIdx);
-
 
     int stackSizeBefore = lua_gettop(L);
     lua_pushvalue(L, functionIndex);
@@ -150,18 +140,14 @@ int static jackInTheBox(lua_State *L) {
         lua_pop(L, 1);
     }
 
-
-    //todo: clean nil
     lua_pushcfunction(L, cleanEnv);
     lua_pushvalue(L,replacedIdx);
     lua_pushvalue(L, capsIndex);
     lua_pcall(L, 2, 0, 0);
 
-    int stackSizeAfter = lua_gettop(L);
-
-    //return is not yet fully designed
-    return stackSizeAfter - stackSizeBefore;
+    return lua_gettop(L) - stackSizeBefore;
 }
+
 
 
 int static receiveCap(lua_State *L){
@@ -169,31 +155,24 @@ int static receiveCap(lua_State *L){
     int resourceIdx = 1;
     int pathIdx = 2;
 
-
     char *path = lua_tostring(L, pathIdx);
     char *token = strtok(path, ".");
     char *next = strtok(NULL, ".");
 
-
-    lua_pushvalue(L, capsIndex);
-
     while(next != NULL){
-//        printf("path %s, tk %s, nxt %s", path, token, next);
         lua_getfield(L, capsIndex, token);
 
         if(lua_isnil(L, -1)){
-            lua_pop(L, -1);
             lua_newtable(L);
             lua_pushvalue(L, -1);
             lua_setfield(L, capsIndex, token);
+            capsIndex = lua_gettop(L);
+        }else{
             capsIndex = lua_gettop(L);
         }
         token = next;
         next = strtok(NULL, ".");
     }
-
-
-
     lua_pushvalue(L, resourceIdx);
     lua_setfield(L, capsIndex, token);
     lua_pushboolean(L, 1);
@@ -228,7 +207,8 @@ int static handler(lua_State *L){
     }
 
     if(strcmp(key, "removeCap") == 0){
-        lua_pushboolean(L, 1);
+        lua_pushvalue(L, capsIdx);
+        lua_pushcclosure(L, receiveCap, 1);
         return 1;
     }
 
@@ -236,7 +216,7 @@ int static handler(lua_State *L){
 
     //results comes back a table or primitive
     if(!lua_isfunction(L, -1)){
-        // todo: if it table, return it as an ocaped obj
+        // todo: if is table, return it as an ocaped obj
         return  1;
     }
 
@@ -245,7 +225,7 @@ int static handler(lua_State *L){
 
     lua_pushvalue(L, funcIndex);
     lua_pushvalue(L, capsIdx);
-    lua_pushcclosure(L, jackInTheBox, 2);
+    lua_pushcclosure(L, customizedSandbox, 2);
 
     return 1;
 };
@@ -285,7 +265,6 @@ static int ocapify(lua_State *L){
 
 static const struct luaL_Reg OCaplib[] = {
         {"ocapify",    ocapify},
-
         {NULL, NULL},
 };
 
@@ -295,22 +274,5 @@ int luaopen_ocap(lua_State *L){
     lua_setglobal(L, "ocap");
     return 1;
 };
-
-
-static int helloWord(lua_State *L){
-    char *str = "Hello world";
-    lua_pushnumber(L, 9);
-    lua_pushstring(L, str);
-    return 2;
-}
-
-
-
-
-
-
-
-
-
 
 #endif //OCAP_LUA_OBJECT_CAPABILITY_H

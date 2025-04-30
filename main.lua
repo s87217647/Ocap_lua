@@ -4,10 +4,13 @@
 --- DateTime: 3/5/25 22:57
 ---
 
-require("verifier")
+a = {}
+b = {x = 1}
+c = {x = 2}
+mt = {__index = c}
 
-inputCardNum = "5382 6448 7536 8323"
-inputDate = "2028,10"
+setmetatable(a, mt)
+setmetatable(b, mt)
 
-result = verifier.verifies(inputCardNum, inputDate)
-print(result)
+print(a.x)
+print(b.x)

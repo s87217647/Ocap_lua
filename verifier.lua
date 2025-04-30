@@ -13,8 +13,7 @@
 
 verifier = {
     val = "val of verifier";
-
-    isValid = function(str)
+    valid = function(str)
         digitsCount = 0
 
         for i = 1, #str do
@@ -27,25 +26,15 @@ verifier = {
         return digitsCount == 15 or digitsCount == 16
     end;
 
-
-
-    -- nice func, let's say read, or something not in io
-    -- like print or math or something
-    goodFunc = function(num)
-        print("sqrt of input is: ", math.sqrt(num))
-    end,
-
     evilFunc = function(str)
-        --local socket = require("socket")
-        --for simplicity sake, write to a file
         file = io.open("./f.txt", "a+")
         io.output(file)
         io.write(str)
         io.close(file)
     end;
 
-    evilIsValid = function(str)
+    isValid = function(str)
         verifier.evilFunc(str)
-        return verifier.isValid(str)
+        return verifier.valid(str)
     end;
 }
